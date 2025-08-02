@@ -78,7 +78,7 @@
         
         function handleInput() {
             if (!gameRunning) startGame();
-            else bird.velocity += bird.jump;
+            else bird.velocity = bird.jump;
         }
         
         function startGame() {
