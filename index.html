@@ -13,39 +13,167 @@
             align-items: center; background: rgba(0,0,0,0.5); color: white;
         }
         #game-over { display: none; }
-        button { padding: 15px 30px; margin-top: 20px; background: #f8d347; border: none; }
+        button { 
+            padding: 15px 30px; 
+            margin-top: 20px; 
+            background: #f8d347; 
+            border: none; 
+            font-size: 1.2rem;
+            border-radius: 5px;
+        }
+        h1 { font-size: 2.5rem; margin-bottom: 20px; }
+        #score-text { font-size: 1.5rem; margin-bottom: 10px; }
+        #home-btn {
+            position: fixed;
+            top: 24px;
+            right: 24px;
+            z-index: 10001;
+            background: #fffbe7;
+            color: #333;
+            border: 2px solid #f8d347;
+            border-radius: 50px;
+            padding: 10px 22px;
+            font-size: 1.1em;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            display: none;
+        }
+        #help-overlay, #credits-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+        }
+        #help-content, #credits-content {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        #help-content h2, #credits-content h2 {
+            margin-bottom: 15px;
+        }
+        #help-content ul, #credits-content ul {
+            list-style: none;
+            padding: 0;
+            margin: 0 0 15px 0;
+            text-align: left;
+        }
+        #help-content li, #credits-content li {
+            margin-bottom: 10px;
+        }
+        #credits-overlay {
+            display: none;
+            position: fixed;
+            z-index: 20001;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(0,0,0,0.7);
+            justify-content: center;
+            align-items: center;
+        }
+        #credits-content {
+            background: #fffbe7;
+            color: #333;
+            padding: 32px 24px;
+            border-radius: 16px;
+            max-width: 90vw;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.2);
+            text-align: left;
+        }
+        #close-credits {
+            margin-top: 20px;
+            background: #f8d347;
+            border: none;
+            border-radius: 5px;
+            padding: 10px 24px;
+            font-size: 1.1em;
+            font-weight: bold;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
     <canvas id="game-canvas"></canvas>
     <div id="start-screen">
+        <h2 style="margin: 0; scale: 0.5;">Therohero Studios Presents</h2>
         <h1>Flappy Bird</h1>
+        <div id="highscore-text" style="font-size:1.2rem;margin-bottom:10px;"></div>
         <button id="start-button">Spiel starten</button>
+        <button id="help-btn">Spielerklärung</button>
+        <button id="credits-btn" style="position:fixed;bottom:18px;left:18px;z-index:10002;">Mitwirkende & Rechte</button>
+    </div>
+    <div id="help-overlay">
+        <div id="help-content">
+            <h2>Wie spielt man?</h2>
+            <ul>
+                <li>Tippe oder drücke die Leertaste, damit der Vogel fliegt.</li>
+                <li>Weiche den Röhren aus.</li>
+                <li>Für jede überflogene Röhre gibt es einen Punkt.</li>
+                <li>Das Spiel endet, wenn du eine Röhre berührst oder den Boden/Decke.</li>
+            </ul>
+            <button id="close-help">Schließen</button>
+        </div>
     </div>
     <div id="game-over">
         <h1>Game Over</h1>
         <p id="score-text">Punkte: 0</p>
+        <p id="highscore-gameover" style="font-size:1.2rem;margin-bottom:10px;"></p>
         <button id="restart-button">Nochmal spielen</button>
+    </div>
+    <button id="home-btn">Home</button>
+    <div id="credits-overlay">
+        <div id="credits-content">
+            <h2>Mitwirkende & Rechte</h2>
+            <ul style="margin-bottom:16px;">
+                <li>Idee & Code: Therohero Studios</li>
+                <li>Originalkonzept: Dong Nguyen</li>
+                <li>Grafik & Sounds: Eigene Umsetzung / frei verwendbare Ressourcen</li>
+                <a href="https://github.com/therohero/flappybird-clone" target="_blank" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'" textDecoration="none">Repository </a><a href="https://github.com/therohero" target="_blank" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'" textDecoration="none">Account</a>
+            </ul>
+            <p style="font-size:0.95em;color:#555;">Dieses Projekt ist ein Fan-Remake zu Lernzwecken und nicht kommerziell.</p>
+            <button id="close-credits">Schließen</button>
+        </div>
     </div>
 
     <script>
     (function() {
         'use strict';
         
-        // KONSTANTE WERTE
-        const PIPE_GAP = 200; // Fester Wert für die Lücke
-        const PIPE_WIDTH = 60;
-        const PIPE_SPEED = 3;
+        // KONSTANTE WERTE - angepasst für Mobile
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        const PIPE_GAP = isMobile ? 150 : 200;
+        const PIPE_WIDTH = isMobile ? 40 : 60;
+        const PIPE_SPEED = isMobile ? 1 : 3;
+        const BIRD_SIZE = isMobile ? 25 : 40;
         let runner = 0;
 
         const canvas = document.getElementById('game-canvas');
         const ctx = canvas.getContext('2d');
         let gameRunning = false, score = 0, animationId = null;
+        let highscore = Number(localStorage.getItem('flappy_highscore')) || 0;
+
+        function updateHighscoreDisplay() {
+            document.getElementById('highscore-text').textContent = `Highscore: ${highscore}`;
+            document.getElementById('highscore-gameover').textContent = `Highscore: ${highscore}`;
+        }
         
-        // Vogel
+        // Vogel - kleiner auf Mobile
         const bird = {
-            x: window.innerHeight / 4, y: 300, width: 40, height: 30, 
-            velocity: 0, gravity: 0.5, jump: -10,
+            x: window.innerHeight / 4, 
+            y: 300, 
+            width: BIRD_SIZE, 
+            height: BIRD_SIZE * 0.75, 
+            velocity: 0, 
+            gravity: isMobile ? 0.1 : 0.5, // weniger Schwerkraft auf Mobile
+            jump: isMobile ? -3 : -10, // schwächerer Sprung auf Mobile
             update: function() {
                 this.velocity += this.gravity;
                 this.y += this.velocity;
@@ -73,6 +201,7 @@
             document.addEventListener('keydown', e => {
                 if (e.code === 'Space') handleInput();
             });
+            canvas.addEventListener('touchstart', handleInput);
             canvas.onclick = handleInput;
         }
         
@@ -81,35 +210,67 @@
             else bird.velocity = bird.jump;
         }
         
+        const homeBtn = document.getElementById('home-btn');
+
+        // Home-Button immer anzeigen, außer im Startscreen
+        function updateHomeBtn() {
+            if (
+                document.getElementById('start-screen').style.display === 'none'
+            ) {
+                homeBtn.style.display = 'block';
+            } else {
+                homeBtn.style.display = 'none';
+            }
+        }
+
+        // Home-Button bringt dich immer zum Startscreen zurück
+        homeBtn.onclick = function() {
+            gameRunning = false;
+            cancelAnimationFrame(animationId);
+            document.getElementById('start-screen').style.display = 'flex';
+            document.getElementById('game-over').style.display = 'none';
+            updateHomeBtn();
+        };
+
+        // Startet das Spiel
         function startGame() {
             if (animationId) cancelAnimationFrame(animationId);
-            
+
             gameRunning = true;
             score = 0;
-            bird.y = 300;
+            bird.y = canvas.height / 2;
             bird.velocity = 0;
             pipes.length = 0;
-            
+
             document.getElementById('start-screen').style.display = 'none';
             document.getElementById('game-over').style.display = 'none';
-            
+            updateHomeBtn();
+            updateHighscoreDisplay();
+
             gameLoop();
         }
-        
+
+        // Beendet das Spiel
         function endGame() {
             gameRunning = false;
             cancelAnimationFrame(animationId);
             document.getElementById('score-text').textContent = `Punkte: ${score}`;
+            if (score > highscore) {
+                highscore = score;
+                localStorage.setItem('flappy_highscore', highscore);
+            }
+            updateHighscoreDisplay();
             document.getElementById('game-over').style.display = 'flex';
+            updateHomeBtn();
         }
         
         function gameLoop() {
             // Update
             bird.update();
             
-            // Neue Röhre
+            // Neue Röhre (langsamer auf Mobile)
             runner++;
-            if (runner % 100 === 0) addPipe();
+            if (runner % (isMobile ? 200 : 100) === 0) addPipe();
             
             // Röhren bewegen
             for (let i = pipes.length - 1; i >= 0; i--) {
@@ -153,13 +314,45 @@
             }
             
             ctx.fillStyle = 'white';
-            ctx.font = 'bold 36px Arial';
-            ctx.fillText(score, 50, 50);
+            ctx.font = 'bold ' + (isMobile ? '24px' : '36px') + ' Arial';
+            ctx.fillText(score, 30, isMobile ? 40 : 50);
             
             animationId = requestAnimationFrame(gameLoop);
         }
         
         init();
+        updateHomeBtn();
+        updateHighscoreDisplay();
+
+        // Hilfe-Overlay
+        const helpBtn = document.getElementById('help-btn');
+        const helpOverlay = document.getElementById('help-overlay');
+        const closeHelp = document.getElementById('close-help');
+
+        helpBtn.onclick = function() {
+            helpOverlay.style.display = 'flex';
+        };
+        closeHelp.onclick = function() {
+            helpOverlay.style.display = 'none';
+        };
+        helpOverlay.onclick = function(e) {
+            if (e.target === helpOverlay) helpOverlay.style.display = 'none';
+        };
+
+        // Credits-Overlay
+        const creditsBtn = document.getElementById('credits-btn');
+        const creditsOverlay = document.getElementById('credits-overlay');
+        const closeCredits = document.getElementById('close-credits');
+
+        creditsBtn.onclick = function() {
+            creditsOverlay.style.display = 'flex';
+        };
+        closeCredits.onclick = function() {
+            creditsOverlay.style.display = 'none';
+        };
+        creditsOverlay.onclick = function(e) {
+            if (e.target === creditsOverlay) creditsOverlay.style.display = 'none';
+        };
     })();
     </script>
 </body>
