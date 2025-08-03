@@ -39,6 +39,22 @@
             box-shadow: 0 2px 8px rgba(0,0,0,0.08);
             display: none;
         }
+        #pause-btn {
+            position: fixed;
+            top: 24px;
+            right: 80px;
+            z-index: 10001;
+            display: none;
+            background: #fffbe7;
+            color: #333;
+            border: 2px solid #f8d347;
+            border-radius: 50px;
+            padding: 10px 22px;
+            font-size: 1.1em;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
         #help-overlay, #credits-overlay {
             position: fixed;
             top: 0;
@@ -98,6 +114,21 @@
             font-weight: bold;
             cursor: pointer;
         }
+        #pause-overlay {
+            display:none;
+            position:fixed;
+            top:0;
+            left:0;
+            width:100vw;
+            height:100vh;
+            background:rgba(0,0,0,0.5);
+            z-index:20000;
+            justify-content:center;
+            align-items:center;
+            color:white;
+            font-size:2.5rem;
+            font-weight:bold;
+        }
     </style>
 </head>
 <body>
@@ -108,6 +139,7 @@
         <div id="highscore-text" style="font-size:1.2rem;margin-bottom:10px;"></div>
         <button id="start-button">Spiel starten</button>
         <button id="help-btn">Spielerklärung</button>
+        <button id="reset-highscore-btn" style="margin-bottom:10px;">Highscore zurücksetzen</button>
         <button id="credits-btn" style="position:fixed;bottom:18px;left:18px;z-index:10002;">Mitwirkende & Rechte</button>
     </div>
     <div id="help-overlay">
@@ -129,6 +161,7 @@
         <button id="restart-button">Nochmal spielen</button>
     </div>
     <button id="home-btn">Home</button>
+    <button id="pause-btn" style="position:fixed;top:24px;right:80px;z-index:10001;display:none;">⏸️</button>
     <div id="credits-overlay">
         <div id="credits-content">
             <h2>Mitwirkende & Rechte</h2>
@@ -136,7 +169,7 @@
                 <li>Idee & Code: Therohero Studios</li>
                 <li>Originalkonzept: Dong Nguyen</li>
                 <li>Grafik & Sounds: Eigene Umsetzung / frei verwendbare Ressourcen</li>
-                <a href="https://github.com/therohero/flappybird-clone" target="_blank" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'" textDecoration="none">Repository </a><a href="https://github.com/therohero" target="_blank" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'" textDecoration="none">Account</a>
+                <a href="https://github.com/therohero/flappybird-clone" target="_blank" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'" text-decoration="none">Repository </a><a href="https://github.com/therohero" target="_blank" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'" textDecoration="none">Account</a>
             </ul>
             <p style="font-size:0.95em;color:#555;">Dieses Projekt ist ein Fan-Remake zu Lernzwecken und nicht kommerziell.</p>
             <button id="close-credits">Schließen</button>
@@ -159,6 +192,8 @@
         const ctx = canvas.getContext('2d');
         let gameRunning = false, score = 0, animationId = null;
         let highscore = Number(localStorage.getItem('flappy_highscore')) || 0;
+        let isJumping = false;
+        let paused = false;
 
         function updateHighscoreDisplay() {
             document.getElementById('highscore-text').textContent = `Highscore: ${highscore}`;
@@ -166,21 +201,59 @@
         }
         
         // Vogel - kleiner auf Mobile
+        const birdImg = new Image();
+        birdImg.src = 'assets/bird.png';
+        const birdJumpImg = new Image();
+        birdJumpImg.src = 'assets/jumpbird.png';
+
+        // Speichere die tatsächliche Bildgröße für die Hitbox
+        let birdTextureWidth = 18;  // Standardwert, falls Bild noch nicht geladen
+        let birdTextureHeight = 12;
+
+        birdImg.onload = function() {
+            birdTextureWidth = birdImg.naturalWidth;
+            birdTextureHeight = birdImg.naturalHeight;
+        };
+        birdJumpImg.onload = function() {
+            // Optional: falls jumpbird.png andere Maße hat
+            birdTextureWidth = birdJumpImg.naturalWidth;
+            birdTextureHeight = birdJumpImg.naturalHeight;
+        };
+
         const bird = {
-            x: window.innerHeight / 4, 
-            y: 300, 
-            width: BIRD_SIZE, 
-            height: BIRD_SIZE * 0.75, 
-            velocity: 0, 
-            gravity: isMobile ? 0.1 : 0.5, // weniger Schwerkraft auf Mobile
-            jump: isMobile ? -3 : -10, // schwächerer Sprung auf Mobile
+            x: window.innerHeight / 4,
+            y: 300,
+            width: BIRD_SIZE,
+            height: BIRD_SIZE,
+            velocity: 0,
+            gravity: isMobile ? 0.1 : 0.5,
+            jump: isMobile ? -3 : -10,
             update: function() {
                 this.velocity += this.gravity;
                 this.y += this.velocity;
             },
             draw: function() {
-                ctx.fillStyle = '#ffeb3b';
-                ctx.fillRect(this.x, this.y, this.width, this.height);
+                const img = isJumping ? birdJumpImg : birdImg;
+                if (img.complete && img.naturalWidth > 0) {
+                    // Immer quadratisch rendern
+                    ctx.drawImage(img, this.x, this.y, this.width, this.height);
+                } else {
+                    ctx.fillStyle = '#ffeb3b';
+                    ctx.fillRect(this.x, this.y, this.width, this.height);
+                }
+            },
+            // Liefert die aktuelle Hitbox (zentriert im Quadrat)
+            getHitbox: function() {
+                // Skaliere die Textur-Maße auf das Quadrat
+                const scale = this.width / Math.max(birdTextureWidth, birdTextureHeight);
+                const hitboxW = birdTextureWidth * scale;
+                const hitboxH = birdTextureHeight * scale;
+                return {
+                    x: this.x + (this.width - hitboxW) / 2,
+                    y: this.y + (this.height - hitboxH) / 2,
+                    width: hitboxW,
+                    height: hitboxH
+                };
             }
         };
         
@@ -207,7 +280,11 @@
         
         function handleInput() {
             if (!gameRunning) startGame();
-            else bird.velocity = bird.jump;
+            else {
+                bird.velocity = bird.jump;
+                isJumping = true;
+                setTimeout(() => { isJumping = false; }, 200);
+            }
         }
         
         const homeBtn = document.getElementById('home-btn');
@@ -232,39 +309,55 @@
             updateHomeBtn();
         };
 
-        // Startet das Spiel
-        function startGame() {
-            if (animationId) cancelAnimationFrame(animationId);
+        // Pause-Button
+        const pauseBtn = document.getElementById('pause-btn');
 
-            gameRunning = true;
-            score = 0;
-            bird.y = canvas.height / 2;
-            bird.velocity = 0;
-            pipes.length = 0;
-
-            document.getElementById('start-screen').style.display = 'none';
-            document.getElementById('game-over').style.display = 'none';
-            updateHomeBtn();
-            updateHighscoreDisplay();
-
-            gameLoop();
+        // Pause-Overlay (optional, für Anzeige)
+        let pauseOverlay = document.getElementById('pause-overlay');
+        if (!pauseOverlay) {
+            pauseOverlay = document.createElement('div');
+            pauseOverlay.id = 'pause-overlay';
+            pauseOverlay.style = `
+                display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;
+                background:rgba(0,0,0,0.5);z-index:20000;justify-content:center;align-items:center;
+                color:white;font-size:2.5rem;font-weight:bold;
+            `;
+            pauseOverlay.innerText = 'Pause';
+            document.body.appendChild(pauseOverlay);
         }
 
-        // Beendet das Spiel
-        function endGame() {
-            gameRunning = false;
-            cancelAnimationFrame(animationId);
-            document.getElementById('score-text').textContent = `Punkte: ${score}`;
-            if (score > highscore) {
-                highscore = score;
-                localStorage.setItem('flappy_highscore', highscore);
+        // Pause-Funktion
+        function togglePause() {
+            if (!gameRunning) return;
+            paused = !paused;
+            if (paused) {
+                pauseOverlay.style.display = 'flex';
+            } else {
+                pauseOverlay.style.display = 'none';
+                gameLoop();
             }
-            updateHighscoreDisplay();
-            document.getElementById('game-over').style.display = 'flex';
-            updateHomeBtn();
         }
-        
+
+        // Taste P für Pause
+        document.addEventListener('keydown', e => {
+            if (e.code === 'KeyP') togglePause();
+        });
+
+        // Button für Pause
+        pauseBtn.onclick = togglePause;
+
+        // Pause-Button nur anzeigen, wenn Spiel läuft (und nicht im Startscreen)
+        function updatePauseBtn() {
+            if (document.getElementById('start-screen').style.display === 'none' && gameRunning) {
+                pauseBtn.style.display = 'block';
+            } else {
+                pauseBtn.style.display = 'none';
+            }
+        }
+
+        // Passe gameLoop an:
         function gameLoop() {
+            if (paused) return; // Bei Pause nicht weiterlaufen!
             // Update
             bird.update();
             
@@ -287,15 +380,28 @@
             }
             
             // Kollision
-            if (bird.y < 0 || bird.y + bird.height > canvas.height) {
+            const birdBox = bird.getHitbox();
+            if (birdBox.y < 0 || birdBox.y + birdBox.height > canvas.height) {
                 endGame();
                 return;
             }
-            
+
             for (const pipe of pipes) {
-                if (bird.x + bird.width > pipe.x && 
-                    bird.x < pipe.x + PIPE_WIDTH &&
-                    (bird.y < pipe.height || bird.y + bird.height > pipe.height + PIPE_GAP)) {
+                // Oben
+                if (
+                    birdBox.x + birdBox.width > pipe.x &&
+                    birdBox.x < pipe.x + PIPE_WIDTH &&
+                    birdBox.y < pipe.height
+                ) {
+                    endGame();
+                    return;
+                }
+                // Unten
+                if (
+                    birdBox.x + birdBox.width > pipe.x &&
+                    birdBox.x < pipe.x + PIPE_WIDTH &&
+                    birdBox.y + birdBox.height > pipe.height + PIPE_GAP
+                ) {
                     endGame();
                     return;
                 }
@@ -307,16 +413,35 @@
             
             bird.draw();
             
-            ctx.fillStyle = '#4CAF50';
+            // Pipe als gestapelte Streifen zeichnen
             for (const pipe of pipes) {
-                ctx.fillRect(pipe.x, 0, PIPE_WIDTH, pipe.height);
-                ctx.fillRect(pipe.x, pipe.height + PIPE_GAP, PIPE_WIDTH, canvas.height - pipe.height - PIPE_GAP);
+                // Obere Pipe (wie gehabt)
+                let y = 0;
+                while (y + 20 < pipe.height) {
+                    ctx.drawImage(pipeBodyImg, pipe.x, y, PIPE_WIDTH, 20);
+                    y += 20;
+                }
+                if (y < pipe.height) {
+                    ctx.drawImage(pipeBodyImg, pipe.x, y, PIPE_WIDTH, pipe.height - y);
+                }
+
+                // Untere Pipe (von unten nach oben stapeln)
+                let bottomPipeTop = pipe.height + PIPE_GAP;
+                let y2 = canvas.height;
+                while (y2 - 20 > bottomPipeTop) {
+                    y2 -= 20;
+                    ctx.drawImage(pipeBodyImg, pipe.x, y2, PIPE_WIDTH, 20);
+                }
+                if (y2 > bottomPipeTop) {
+                    ctx.drawImage(pipeBodyImg, pipe.x, bottomPipeTop, PIPE_WIDTH, y2 - bottomPipeTop);
+                }
             }
             
             ctx.fillStyle = 'white';
             ctx.font = 'bold ' + (isMobile ? '24px' : '36px') + ' Arial';
             ctx.fillText(score, 30, isMobile ? 40 : 50);
             
+            updatePauseBtn();
             animationId = requestAnimationFrame(gameLoop);
         }
         
@@ -352,6 +477,48 @@
         };
         creditsOverlay.onclick = function(e) {
             if (e.target === creditsOverlay) creditsOverlay.style.display = 'none';
+        };
+
+        const pipeBodyImg = new Image();
+        pipeBodyImg.src = 'assets/pipes/pipebody.png';
+
+        // Sound laden
+
+        function startGame() {
+            gameRunning = true;
+            paused = false;
+            score = 0;
+            runner = 0;
+            bird.y = 300;
+            bird.velocity = 0;
+            pipes.length = 0;
+            document.getElementById('start-screen').style.display = 'none';
+            document.getElementById('game-over').style.display = 'none';
+            updateHomeBtn();
+            updatePauseBtn();
+            animationId = requestAnimationFrame(gameLoop);
+        }
+
+        function endGame() {
+            gameRunning = false;
+            cancelAnimationFrame(animationId);
+            document.getElementById('score-text').textContent = `Punkte: ${score}`;
+            if (score > highscore) {
+                highscore = score;
+                localStorage.setItem('flappy_highscore', highscore);
+            }
+            updateHighscoreDisplay();
+            document.getElementById('game-over').style.display = 'flex';
+            updateHomeBtn();
+            updatePauseBtn();
+        }
+
+        const resetHighscoreBtn = document.getElementById('reset-highscore-btn');
+        resetHighscoreBtn.onclick = function() {
+            highscore = 0;
+            localStorage.setItem('flappy_highscore', '0');
+            updateHighscoreDisplay();
+            alert('Highscore wurde zurückgesetzt!');
         };
     })();
     </script>
